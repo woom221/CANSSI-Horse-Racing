@@ -1,0 +1,77 @@
+```{r}
+# install necessary packages
+
+install.packages("arrow")
+install.packages("ggplot2")
+install.packages("tidyverse")
+```
+# For testing the accuracy (for top 7 prediction)
+
+
+```{r}
+# load library
+
+library(arrow)
+library(tidyverse)
+library(ggplot2)
+```
+
+
+```{r}
+
+# load data to compare the predicted results
+
+data <- read_parquet("trots_2013-2022.parquet")
+```
+
+```{r}
+
+# clean and reorganize
+
+test_data <- data %>% filter(RaceStartTime >= as.POSIXct('2021-11-01 00:00:00'))
+
+test_data_one <- test_data %>% filter(Prizemoney > 0) %>% mutate(Winning = 1)
+test_data_two <- test_data %>% filter(Prizemoney <= 0) %>% mutate(Winning = 0)
+
+test_data <- rbind(test_data_one, test_data_two)
+
+test_data <- test_data %>% group_by(RaceID) %>% arrange(Prizemoney, .by_group=TRUE) %>% ungroup() %>% select(RaceID, HorseID, Prizemoney, FinishPosition, Winning)
+
+```
+
+```{r}
+
+# load the forecast data and reorganize
+
+predicted_data <- read.parquet('CANSSI forecast.parquet')
+
+predicted_data <- predicted_data %>% select(RaceID, HorseID, winprobability)
+
+predicted_data <- predicted_data %>% mutate(Winning = 0)
+
+
+predicted_data_top <- predicted_data %>% group_by(RaceID) %>% slice_max(order_by=winprobability, n=7) %>% mutate(Winning = 1) %>% ungroup()
+
+predicted_data <- rbind(predicted_data_top, predicted_data)
+
+predicted_data <- distinct(predicted_data, RaceID, HorseID,.keep_all= TRUE)
+
+
+```
+
+```{r}
+
+# test the accuracy of top 7 prediction
+
+test_data <- test_data %>% group_by(RaceID) %>% arrange(HorseID, .by_group=TRUE) %>% ungroup()
+
+# view(test_data)
+
+predicted_data <- predicted_data %>% group_by(RaceID) %>% arrange(HorseID, .by_group=TRUE) %>% ungroup()
+
+# view(predicted_data)
+
+
+sum(test_data$Winning == predicted_data$Winning) / nrow(test_data)
+
+```
