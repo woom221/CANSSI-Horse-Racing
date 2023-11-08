@@ -43,7 +43,7 @@ test_data <- test_data %>% group_by(RaceID) %>% arrange(Prizemoney, .by_group=TR
 
 # load the forecast data and reorganize
 
-predicted_data <- read.parquet('CANSSI forecast.parquet')
+predicted_data <- read_parquet('CANSSI forecast.parquet')
 
 predicted_data <- predicted_data %>% select(RaceID, HorseID, winprobability)
 
@@ -73,5 +73,15 @@ predicted_data <- predicted_data %>% group_by(RaceID) %>% arrange(HorseID, .by_g
 
 
 sum(test_data$Winning == predicted_data$Winning) / nrow(test_data)
+
+```
+
+```{r}
+
+# per race comparison example
+
+# test_data %>% filter(RaceID == 1680313) %>% arrange(desc(Prizemoney))
+
+# predicted_data %>% filter(RaceID == 1680313) %>% arrange(desc(winprobability))
 
 ```
