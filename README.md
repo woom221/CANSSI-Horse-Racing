@@ -1,6 +1,6 @@
 # CANSSI-Horse-Racing
 
-This repository is dedicated for participating in French Trot Horse Racing: Forecasting Competition organized by CANSSI Ontario.
+This repository is dedicated for participation in French Trot Horse Racing: Forecasting Competition organized by CANSSI Ontario.
 
 We are undergraduate students with diverse background which include Statistics, Chemistry and Computer Science from University of Toronto.
 
