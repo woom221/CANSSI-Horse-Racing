@@ -1,0 +1,82 @@
+---
+title: "French trot"
+author: "Minghao Guo"
+date: "2023-11-03"
+output: pdf_document
+---
+#some notes
+for finish position, all letters are disgarded as missing data
+
+## Beginning
+
+Inserting the file
+
+```{r pressure, echo=FALSE}
+install.packages("arrow")
+library(arrow)
+data <- arrow::read_parquet('trots_2013-2022.parquet')
+```
+
+Compare PIRposition
+```{r}
+library(ggplot2)
+library(dplyr)
+
+model <- lm(Prizemoney ~ PIRPosition, data=data) #Thru Linear Regression
+summary(model)
+
+ggplot(data, aes(x = as.factor(PIRPosition), y = as.numeric(FinishPosition))) +
+  geom_boxplot() +
+  labs(x = 'Position In Running (PIRPosition)', y = 'Finish Position') +
+  theme_minimal()
+```
+Compare PriceSP
+```{r}
+library(ggplot2)
+library(dplyr)
+
+model <- lm(Prizemoney ~ PriceSP, data=data) #Thru Linear Regression
+summary(model)
+
+#if only consider from 0 to 200.
+# Filter data for PriceSP between 0 and 200
+data_filtered <- data %>%
+  filter(PriceSP >= 0 & PriceSP <= 200)
+
+# Bin 'PriceSP' into ranges of size 10 within the filtered data.
+data_filtered$PriceSP_Binned <- cut(data_filtered$PriceSP,
+                                    breaks = seq(0, 200, by = 10),
+                                    include.lowest = TRUE,
+                                    labels = paste(seq(0, 190, by = 10), seq(9, 199, by = 10), sep = "-"))
+
+# Convert binned PriceSP into a factor for plotting
+data_filtered$PriceSP_Binned <- factor(data_filtered$PriceSP_Binned)
+
+# Create the boxplot using the binned and filtered PriceSP
+ggplot(data_filtered, aes(x = PriceSP_Binned, y = as.numeric(FinishPosition))) +
+  geom_boxplot() +
+  labs(x = 'Binned PriceSP (0-200)', y = 'Finish Position') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) # Rotate x labels for better visibility
+```
+
+Compare Prize and RaceGroup
+```{r}
+library(ggplot2)
+library(dplyr)
+model <- lm(Prizemoney ~ RaceGroup + PriceSP, data=data) #Thru Linear Regression
+summary(model)
+
+ggplot(data, aes(x = as.factor(RaceGroup), y = as.numeric(FinishPosition))) +
+  geom_boxplot() +
+  labs(x = 'RaceGroup', y = 'Finish Position') +
+  theme_minimal()
+
+ggplot(data, aes(x = as.factor(RaceGroup), y = as.numeric(FinishPosition))) +
+  geom_boxplot() +
+  geom_jitter(aes(color = PriceSP), width = 0.2, alpha = 0.5) +  # Add jittered points colored by PriceSP
+  labs(x = 'RaceGroup', y = 'Finish Position', color = 'PriceSP') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels for better visibility
+        legend.position = "right")  # Position the legend on the right
+```

@@ -1,0 +1,414 @@
+```{r}
+# libraries to import
+
+library(arrow)
+library(tidyverse)
+library(ggplot2)
+
+```
+
+```{r}
+
+data <- read_parquet("trots_2013-2022.parquet")
+head(data, 50)
+
+summary(data$Saddlecloth)
+
+unique(data$Saddlecloth)
+
+# convert the saddle cloth data into integer
+
+generate_twenty <- function(lst) {
+  for (i in 1:20) {
+    lst[i] <- as.character(i)
+  }
+  return(lst)
+}
+
+saddle_levels <- character(20)
+
+
+data$Saddlecloth <- factor(data$Saddlecloth, levels=generate_twenty(saddle_levels))
+
+unique(data$Saddlecloth)
+
+data$FinishPosition <- str_trim(data$FinishPosition)
+unique(data$FinishPosition)
+
+#data %>% select(GoingAbbrev, RaceID, GoingID, ClassRestriction)
+unique(data$ClassRestriction)
+unique(data$GoingAbbrev)
+unique(data$GoingID)
+```
+
+```{r}
+
+winning_data <- data %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3" | FinishPosition == "4" | FinishPosition == "5" | FinishPosition == "6" | FinishPosition == "7")
+
+head(winning_data$FinishPosition, 20)
+
+winning_data$FinishPosition <- as.numeric(winning_data$FinishPosition)
+
+head(winning_data$FinishPosition, 20)
+
+```
+
+```{r}
+
+ggplot(data=winning_data, mapping=aes(x=Saddlecloth, y=FinishPosition)) +
+  geom_boxplot()
+```
+
+```{r}
+mdl <- lm(data=winning_data, FinishPosition ~ Saddlecloth)
+
+summary(mdl)
+
+# Conclusion 1: there are minor differences depending on the choice of the saddle cloth (i.e. Saddlecloth = 1 results in the estimation of 4.2 FinishPosition while Saddlecloth = 18 results in the estimation of 3.8 finish position). This doesn't seem like a significant predictor for deciding the winning probability.
+```
+
+```{r}
+
+losing_data <- data %>% filter(FinishPosition != "1", FinishPosition != "2", FinishPosition != "3", FinishPosition != "4", FinishPosition != "5", FinishPosition != "6", FinishPosition != "7")
+
+
+nrow(losing_data)
+unique(losing_data$FinishPosition)
+
+losing_data_category <- losing_data %>% filter(FinishPosition == "BS" | FinishPosition == "UN" | FinishPosition == "DQ" | FinishPosition == "PU" | FinishPosition == "NP" | FinishPosition == "FL" | FinishPosition == "UR" | FinishPosition == "WC") %>% mutate(FinishPosition = "50")
+
+losing_data_numeric <- losing_data %>% filter(FinishPosition != "1", FinishPosition != "2", FinishPosition != "3", FinishPosition != "4", FinishPosition != "5", FinishPosition != "6", FinishPosition != "7", FinishPosition != "BS", FinishPosition != "UN", FinishPosition != "DQ", FinishPosition != "PU", FinishPosition != "NP", FinishPosition != "FL", FinishPosition != "UR", FinishPosition != "WC")
+
+unique(losing_data_category$FinishPosition)
+
+unique(losing_data_numeric$FinishPosition)
+
+losing_data <- rbind(losing_data_category, losing_data_numeric)
+
+nrow(losing_data)
+```
+
+```{r}
+losing_data$FinishPosition <- as.numeric(losing_data$FinishPosition)
+
+finishpos_saddlecloth <- ggplot(data=losing_data, aes(x=Saddlecloth, y=FinishPosition)) + 
+  geom_boxplot()
+
+finishpos_saddlecloth
+
+# Conclusion 2: Saddle cloth type seems to greatly affect the finish position result. We should include saddle cloth as one of our predictors. There seems to be a trend where certain type of saddlecloth results in lower chance of being disqualified by mutating losing_data_category to 50. 
+```
+
+```{r}
+
+mdl_two <- lm(data=losing_data, FinishPosition ~ Saddlecloth)
+
+summary(mdl_two)
+
+# Conclusion: Saddle cloth type seems to greatly affect the finish position result. We should include saddle cloth as one of our predictors.
+
+# I subdivided finish position into two: "winning" (rank 1 to 7) and "not winning" (rank 8 to 18 + disqualified horses). Note: all disqualified horses were grouped into a single rank as 50 to give higher weight towards the rank. From rank 1-7, there were no significant difference in wearing different saddle cloths. From not winning horses, I noticed that saddle cloth 14, 15, 16, 17 all had significantly lower chance of being disqualified. I have done my analysis by giving the weight of being disqualified as 50. I started to see significant difference in rank (for instance rank goes down from 33 to 37 from one saddle cloth to another).
+```
+
+# SexRestriction -> Analysis on C&G group competing in other competition
+
+```{r}
+
+# Check if there's a lot of C&G in the entire dataset
+
+test_1 <- data %>% filter(SexRestriction == "C&G")
+nrow(test_1)
+
+# We notice there's 120745 C&G data
+
+# Check if the age of C&G group exceeds age 4
+
+test_2 <- data %>% filter(SexRestriction == "C&G") %>% filter(HorseAge >= 5)
+nrow(test_2)
+
+# Interestingly, female horses were also be in category C&G 
+
+data %>% filter(SexRestriction == "C&G") %>% filter(Gender == "F")
+
+# I've decided to assume that C&G group is for young male horses (age below 4) that have been castrated. Interestingly, there were some female horses that were part of C&G category. I decided to ignore these female horses that were part of C&G category as well because there were not many data with this condition. 
+
+# Recall: C for male horses age less than 4 and G for male horses that have been castrated. C&G is not restricted to horses of C AND G; I figured there's a case where it was C OR G but this was also a very rare. With this, I'll just assume that C&G is looking at C AND G (i.e, age below 4 and castrated). 
+```
+
+```{r}
+
+data %>% filter(RaceID==1621386) %>% select(FinishPosition, RaceID, Gender, SexRestriction, HorseAge)
+
+data %>% filter(RaceID==1584675) %>% select(FinishPosition, RaceID, Gender, SexRestriction, HorseAge)
+
+data %>% filter(RaceID==1596840) %>% select(FinishPosition, RaceID, Gender, SexRestriction, HorseAge)
+
+data %>% filter(RaceID==1621385) %>% select(FinishPosition, RaceID, Gender, SexRestriction, HorseAge)
+
+```
+
+# Additional investigation: For a competition including both genders, does male horses have significantly higher chance in winning the race compared to female horses?
+
+```{r}
+female_vs_male <- data %>% filter(SexRestriction == "") %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3" | FinishPosition == "4" | FinishPosition == "5" | FinishPosition == "6" | FinishPosition == "7"  | FinishPosition == "8") %>% select(SexRestriction, Gender, FinishPosition)
+```
+
+```{r}
+both_sex <- data %>% filter(SexRestriction == "") %>% select(SexRestriction, Gender, FinishPosition, RaceID) %>% group_by(RaceID) %>% summarise(both=length(unique(Gender)))
+
+#nrow(both_sex)
+#nrow(both_sex %>% filter(Gender=="M"))
+```
+
+```{r}
+both_sex_races <- both_sex %>% filter(both == 2)
+
+nrow(both_sex_races)
+
+test_both_sex_races <- data %>% filter(RaceID %in% both_sex_races$RaceID) %>% select(SexRestriction, Gender, Prizemoney, RaceID, Disqualified, FinishPosition, AgeRestriction, HorseAge)
+```
+
+```{r}
+
+test_data_two <- test_both_sex_races %>% group_by(RaceID) %>% summarise(count = n()) %>% filter(count < 8)
+
+```
+
+```{r}
+
+test_data_three <- test_both_sex_races %>% filter(Gender == "F") %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3") %>% select(HorseAge, AgeRestriction, FinishPosition, Gender, RaceID)
+
+test_data_four <- test_both_sex_races %>% filter(Gender == "M") %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3") %>% select(HorseAge, AgeRestriction, FinishPosition, Gender, RaceID)
+
+```
+
+
+```{r}
+test_both_sex_races %>% filter(RaceID == 1598497) %>% select(SexRestriction, Gender, Prizemoney, RaceID, Disqualified, FinishPosition, AgeRestriction, HorseAge)
+
+```
+
+```{r}
+
+summary(lm(data=test_both_sex_races, Prizemoney ~ Gender))
+
+#nrow(test_data %>% filter(Gender == "M"))
+
+#nrow(test_data %>% filter(Gender == "F"))
+
+nrow(test_both_sex_races %>% filter(Disqualified == FALSE) %>% filter(Gender == "M") %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3" |FinishPosition == "4" |FinishPosition == "5" | FinishPosition == "6" | FinishPosition == "7")) / nrow(test_data %>% filter(Gender == "M"))
+
+nrow(test_both_sex_races %>% filter(Disqualified == FALSE) %>% filter(Gender == "F") %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3" |FinishPosition == "4" |FinishPosition == "5" | FinishPosition == "6" | FinishPosition == "7")) / nrow(test_data %>% filter(Gender == "F"))
+
+
+```
+
+# StartingLine -> maybe associated with handicap distance further study needed
+
+```{r}
+handicap <- data$HandicapDistance
+head(handicap)
+unique(handicap)
+# handicap distances are: -50, -25, 0, 25, 50, 75 
+
+starting <- data$StartingLine
+head(starting)
+unique(starting)
+# starting line: 1, 2, -1
+
+# Question: is starting line 1 => handicap distance of X? 
+# This hypothesis was not true. There's no direct relationship.
+  
+nov <- data %>% filter(StartingLine == 1) %>% select(HandicapDistance)
+
+nrow(nov)
+
+# Starting line = 1 means handicap distance = 0?
+
+dec <- data %>% filter(StartingLine == -1) %>% select(HandicapDistance)
+
+dec
+
+# Starting line = -1, 1M, rest 10k, 6k
+
+#There's no direct relationship between starting line and handicap distance. 
+#In a way, those with handicap had to stay in starting line -1. For those who did not have any handicap distance stayed in either line 1 or 2. Most data were with starting line of -1. 
+
+jan <- data %>% filter(StartingLine == -1) %>% filter(StartType == "V") %>% select(StartType)
+
+jan
+
+# Starting Line == -1, 1, 2 -> starttype == M
+# Starting Line == -1 -> mostly starttype == V
+# then is startline 1 vs 2 => both M
+
+negative_start_line <- data %>% filter(StartingLine == -1) %>% filter(StartType == "M") %>% select(RaceID, StartingLine, FinishPosition, StartType)
+
+data %>% filter(RaceID %in% negative_start_line$RaceID) %>% filter(StartingLine != -1) %>% select(RaceID, StartingLine, FinishPosition, StartType)
+
+#data %>% filter(RaceID == 1641580) %>% select(RaceID, StartingLine, FinishPosition, StartType, HandicapDistance)
+
+# It's possible to have StartingLine = -1, 1, 2 altogether in a single race. However, this is extremely rare (3 races) and there is at most ONE horse that starts with StartingLine = -1. Thus, we can safely assume that for StartType == "M", StartingLine is either (1 and 2) or ONLY -1.
+```
+
+# Is starting line 1 better compared to starting line 2?
+
+```{r}
+
+# Trying this with winning_data 
+
+# start_one in winning_data
+
+start_one <- winning_data %>% filter(StartingLine == 1) %>% select(FinishPosition, StartingLine)
+
+start_two <- winning_data %>% filter(StartingLine == 2) %>% select(FinishPosition, StartingLine)
+
+# starting line: 1, 2, -1
+
+nrow(start_one) / nrow(data %>% filter(StartingLine == 1) %>%  select(FinishPosition, StartingLine))
+
+nrow(start_two) / nrow(data %>% filter(StartingLine == 2) %>%  select(FinishPosition, StartingLine))
+```
+
+```{r}
+
+# compared to start_two
+
+start_two <- winning_data %>% filter(StartingLine == 2) %>% select(FinishPosition, StartingLine)
+nrow(start_two)
+
+# We see that for starting line == 1, there's 62786 data that belongs to Finish Position 1 to 7 whereas for line == 2, there's 28300 data that belongs to Finish Position that is 8-18 and disqualified. This intuitively seems like starting line 1 has more benefit towards a chance of winning for the case of rank 1 to 7. 
+
+# start_one in losing_data
+
+start_one_losing <- losing_data %>% filter(StartingLine == 1) %>% select(FinishPosition, StartingLine)
+start_one_losing
+
+nrow(start_one_losing)
+
+start_two_losing <- losing_data %>% filter(StartingLine == 2) %>% select(FinishPosition, StartingLine)
+start_two_losing
+nrow(start_two_losing)
+
+# For losing_data it seems like 43571 cases were starting line == 1 whereas 40897 cases were at starting line = 2. I'm not sure if this is supposed to imply something significant
+
+# Just by looking at the result, it seems like for the Finish Position 1 to 7, starting line 1 has advantage over 2 significantly (about 2 times). For Finish position that did not lead to winning, it seems like there also exist a similar trend where starting line 1 is more advantageous compared to starting line 2. However, the difference is quite small. Overall, we can conclude that there's starting line = 1 is more advantageous compared to starting line = 2. 
+```
+
+# NoFrontCover -> needs further analysis especially for value -9
+
+```{r}
+
+unique(data$NoFrontCover)
+# how often does -9 show up in our data? is -9 supposed to mean a missing data? => there's quite a lot of -9 showing up in our entire data so we can't ignore this -9
+
+# based on my research it seems like usually in horse racing, Good cover is particularly valuable in longer races where conserving energy is essential (having a cover is most likely better than not having a cover)
+
+# but what is -9? => then what if it was just a short distance competition so they decided not to write 1 or 0 since it's meaningless? 
+
+# or since we can't figure what this -9 is, can we look into whether this is related to the winning rate?
+```
+
+```{r}
+
+# NoFrontcover = -9 > NoFrontcover = 0 > NoFrontcover = 1 for number of cases
+
+temp_race_data <- data %>% filter(NoFrontCover == 0) %>% filter(PositionInRunning == 18) %>% select(NoFrontCover, WideOffRail, PositionInRunning, RaceID, Distance, FinishPosition)
+
+temp_race_data
+
+# When NoFrontCover == 0, PIR can never be 1
+
+```
+# TASK #1 WideOffRail <- find if this matters for winning probability
+```{r}
+wideoff <- data$WideOffRail
+# ggplot(data=data, aes(x=wideoff, y=FinishPosition)) + geom_boxplot()
+
+# or can we look at it this way?
+unique(data$WideOffRail)
+# -9  1  2  3  5  4  6
+
+wideoff_one <- data %>% filter(WideOffRail == 1) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_one_prob <- nrow(wideoff_one)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6)) 
+
+wideoff_two <- data %>% filter(WideOffRail == 2) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_two_prob <- nrow(wideoff_two)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6)) 
+
+wideoff_three <- data %>% filter(WideOffRail == 3) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_three_prob <- nrow(wideoff_three)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6)) 
+wideoff_four <- data %>% filter(WideOffRail == 4) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_four_prob <- nrow(wideoff_four)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6))
+
+wideoff_five <- data %>% filter(WideOffRail == 5) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_five_prob <- nrow(wideoff_five)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6))
+
+wideoff_six <- data %>% filter(WideOffRail == 6) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_six_prob <- nrow(wideoff_six)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6)) 
+
+wideoff_neg_nine <- data %>% filter(WideOffRail == -9) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5|FinishPosition == 6| FinishPosition == 7) %>% select(WideOffRail, FinishPosition)
+
+wideoff_neg_nine_prob <- nrow(wideoff_neg_nine)/nrow(data %>% filter(WideOffRail == 1 | WideOffRail == 2 | WideOffRail == 3| WideOffRail == 4| WideOffRail == 5| WideOffRail == 6)) 
+wideoff_one_prob
+wideoff_two_prob
+wideoff_three_prob
+wideoff_four_prob
+wideoff_five_prob
+wideoff_six_prob
+wideoff_neg_nine_prob
+```
+# TASK 2
+
+# NoFrontCover = 1 vs NoFrontCover = 0, find if this matters for winning probability
+
+```{r}
+
+nofront <- data %>% filter(NoFrontCover == 1) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7) %>% select(NoFrontCover, FinishPosition)
+
+nrow(nofront)/nrow(data %>% filter(NoFrontCover == 1| NoFrontCover == 0| NoFrontCover == -9)%>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7))
+
+yesfront <- data %>% filter(NoFrontCover == 0) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7) %>% select(NoFrontCover, FinishPosition) 
+
+nrow(yesfront)/nrow(data %>% filter(NoFrontCover == 1| NoFrontCover == 0| NoFrontCover == -9)%>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7))
+
+nofront_negnine <- data %>% filter(NoFrontCover == -9) %>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7) %>% select(NoFrontCover, FinishPosition)
+
+nrow(nofront_negnine)/nrow(data %>% filter(NoFrontCover == 1| NoFrontCover == 0| NoFrontCover == -9)%>% filter(FinishPosition == 1| FinishPosition == 2| FinishPosition == 3| FinishPosition == 4| FinishPosition == 5| FinishPosition == 6| FinishPosition == 7))
+
+
+```
+
+# Position in running = -9, WideOffRail = -9 are always together with NoFrontCover = -9
+
+```{r}
+no_front_neg_nine <- data %>% filter(NoFrontCover == -9) %>% select(NoFrontCover)
+nrow(no_front_neg_nine)
+
+# there's 778645 cases where it's written as NoFrontCover = -9
+
+no_front_one <- data %>% filter(NoFrontCover == 1) %>% select(NoFrontCover)
+nrow(no_front_one)
+
+no_front_zero <- data %>% filter(NoFrontCover == 0) %>% select(NoFrontCover)
+nrow(no_front_zero)
+nrow(data)
+
+neg_nine <- data %>% filter(NoFrontCover == -9)
+neg_nine
+
+# I found out that if NoFrontCover == -9,  then PositionInRunning == -9 and WideOffRail == -9. 
+
+unique(data$WideOffRail)
+# for WideOffRail: -9, 1, 2, 3, 4, 5, 6
+
+# NOTE: if the shape of the track is oval/circular it seems like wideoffrail matters whereas if it was just straight line track, the wideoffrail doesn't matter. what if this neg 9 is for the cases where it was straight line track so there's no need to talk about it and instead wrote -9? => based on the analysis we figured this isn't true
+```
+
+
+

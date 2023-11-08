@@ -1,0 +1,204 @@
+```{r}
+install.packages("arrow")
+install.packages("ggplot2")
+install.packages("tidyverse")
+```
+
+```{r}
+# libraries to import
+
+library(arrow)
+library(tidyverse)
+library(ggplot2)
+
+```
+
+```{r}
+data <- read_parquet("trots_2013-2022.parquet")
+
+```
+
+
+
+```{r}
+
+set.seed(998905029)
+
+# divide into training data set
+
+# this was actually not needed but at this stage I just did...
+
+sample <- sample(c(TRUE, FALSE), nrow(data), replace=TRUE, prob=c(0.7,0.3))
+train_data <- data[sample, ]
+test_data <- data[!sample, ]
+```
+
+```{r}
+summary(train_data)
+```
+
+```{r}
+# distance analysis
+
+#unique(train_data$Distance)
+
+#unique(train_data$FinishPosition)
+
+# clean the data
+
+train_data$FinishPosition <- str_trim(train_data$FinishPosition)
+
+
+# For each distance plot the details of horses that were in <=5 finish position
+
+top_five <- train_data %>% filter(FinishPosition == "1" | FinishPosition == "2" | FinishPosition == "3" | FinishPosition == "4" | FinishPosition == "5")
+
+top_five_row_1 <- top_five %>% filter(Distance > 1500, Distance <= 2000) %>% mutate(Distance_category = "1500-2000")
+
+top_five_row_2 <- top_five %>% filter(Distance > 2000, Distance <= 2500) %>% mutate(Distance_category = "2000-2500")
+
+top_five_row_3 <- top_five %>% filter(2500 < Distance, Distance <= 3000) %>% mutate(Distance_category = "2500-3000")
+
+top_five_row_4 <- top_five %>% filter(3000 < Distance, Distance <= 3500) %>% mutate(Distance_category = "3000-3500")
+
+top_five_row_5 <- top_five %>% filter(3500 < Distance, Distance <= 4000) %>% mutate(Distance_category = "3500-4000")
+
+top_five_row_6 <- top_five %>% filter(4000 < Distance, Distance <= 4500) %>% mutate(Distance_category = "4000-4500")
+
+top_five <- rbind(top_five_row_1, top_five_row_2, top_five_row_3, top_five_row_4, top_five_row_5, top_five_row_6)
+
+ggplot(data=top_five, mapping=aes(x=factor(Distance_category), y=HorseAge, col=Gender)) + geom_boxplot(position=position_dodge(0.6), width=0.5) + scale_y_continuous("Horse Age") + theme_bw() + theme(legend.position="bottom")
+
+```
+
+```{r}
+unique((train_data %>% filter(Distance < 2000))$HorseAge)
+unique((train_data %>% filter(Distance < 3000))$HorseAge)
+unique((train_data %>% filter(Distance > 3500))$HorseAge)
+
+# Conclusion
+
+# Younger horses perform better for shorter distances while Older horses perform better for longer distances
+```
+
+```{r}
+
+# Age Restriction Analysis
+
+unique(train_data$AgeRestriction)
+
+# Take none-interval ones out
+
+Age_restriction_cat <- c("6-9yo", "7&8yo", "6-8yo", "4&5yo", "7-10yo", "6-10yo", "6&7yo", "5-10yo", "5&6yo", "5-7yo", "5-8yo", "5-9yo", "7-9yo", "8-10yo", "4-6yo",  "4-7yo", "4-10yo", "6yo+", "4yo+", "4-8yo", "8&9yo", "7yo+", "4-9yo", "3-5yo", "5yo+", "3yo+", "3-10yo", "8yo+", "9&10yo")
+
+#for (i in 1:length(Age_restriction_cat)) {
+#  sample_data <- train_data %>% filter(AgeRestriction == Age_restriction_cat[i]) %>% filter(strtoi(FinishPosition) < 11)
+#  print(ggplot(data=sample_data, mapping=aes(x=factor(HorseAge), y=strtoi(FinishPosition))) + geom_boxplot() + ggtitle(Age_restriction_cat[i]))
+#}
+
+# further analysis
+
+nrow(train_data %>% filter(AgeRestriction == "3yo+"))
+
+# Conclusion
+
+# Usually younger generations perform better for multie age competition. However, this may be related to the previous analysis as well.
+```
+
+```{r}
+
+unique((train_data %>% filter(AgeRestriction == "7yo+"))$Distance)
+
+```
+
+```{r}
+# Class Restriction
+#unique(train_data$ClassRestriction)
+```
+
+```{r}
+# GoingAbbrev Understanding
+
+#unique(train_data$GoingAbbrev)
+
+temp_data <- train_data %>% filter(!is.na(strtoi(FinishPosition)))
+
+temp_data <- temp_data %>% arrange(HorseAge) %>% mutate(FinishPosition=factor(FinishPosition, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18")))
+
+going_abbrev_cat <- unique(temp_data$GoingAbbrev)
+
+#for (i in 1:length(going_abbrev_cat)) {
+#  print(ggplot(data=temp_data, mapping=aes(x=HorseAge, y=FinishPosition)) + geom_boxplot() + ggtitle(going_abbrev_cat[i]))
+#}
+
+# Conclusion: No relationship between GoingAbbrev and Age. Since every horses share the same GoingAbbrev, if we can't find any other correlation, there is no reason to consider this predictor.
+
+
+
+```
+
+```{r}
+
+# Handicap Distance Analysis
+
+unique(train_data$HandicapDistance)
+```
+
+```{r}
+
+# notice there are quiet few negative handicap 
+
+print(nrow(train_data %>% filter(HandicapDistance < 0)))
+print(nrow(train_data %>% filter(HandicapDistance == 0)))
+print(nrow(train_data %>% filter(HandicapDistance > 0)))
+
+```
+
+```{r}
+
+handicap_negative_data <- train_data %>% filter(!is.na(strtoi(FinishPosition))) %>% filter(HandicapDistance < 0)
+
+handicap_negative_data <- handicap_negative_data %>% mutate(FinishPosition=factor(FinishPosition, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18")))
+
+ggplot(data=handicap_negative_data, mapping=aes(x=factor(HandicapDistance), y=as.numeric(FinishPosition))) + geom_boxplot() + scale_y_continuous("Finish Position")
+
+```
+
+```{r}
+
+handicap_zero_data <- train_data %>% filter(!is.na(strtoi(FinishPosition))) %>% filter(HandicapDistance == 0)
+
+handicap_zero_data <- handicap_zero_data %>% mutate(FinishPosition=factor(FinishPosition, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18")))
+
+ggplot(data=handicap_zero_data, mapping=aes(x=factor(HandicapDistance), y=as.numeric(FinishPosition))) + geom_boxplot() + scale_y_continuous("Finish Position")
+```
+
+```{r}
+
+handicap_positive_data <- train_data %>% filter(!is.na(strtoi(FinishPosition))) %>% filter(HandicapDistance > 0)
+
+handicap_positive_data <- handicap_positive_data %>% mutate(FinishPosition=factor(FinishPosition, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18")))
+
+ggplot(data=handicap_positive_data, mapping=aes(x=factor(HandicapDistance), y=as.numeric(FinishPosition))) + geom_boxplot() + scale_y_continuous("Finish Position")
+```
+
+```{r}
+
+unique(handicap_zero_data$HandicapType)
+```
+
+
+```{r}
+summary(as.numeric(handicap_negative_data$FinishPosition))
+summary(as.numeric(handicap_zero_data$FinishPosition))
+summary(as.numeric(handicap_positive_data$FinishPosition))
+
+handicap_max_data <- handicap_positive_data %>% filter(HandicapDistance == 75)
+
+nrow(handicap_max_data)
+
+summary(as.numeric(handicap_max_data$FinishPosition))
+
+# Conclusion : if given max handicap (75), finish position gets much higher. Other positively handicapped showed a slight disadvantage 
+```
+
