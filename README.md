@@ -12,5 +12,5 @@ We are undergraduate students with diverse background which include Statistics, 
 
 ## About Explanatory Notebook
 
-We did not anticipate to submit the explanatory notebook. Since we didn't have enough time to compile all our pre-processing and analysis codes together neatly, we instead created a pdf document which briefly explains our thought process of what and how we came up with the final model.
+We did not anticipate to submit the explanatory notebook. Since we didn't have enough time to compile all our pre-processing and analysis codes together neatly, we instead created a pdf document which briefly explains our thought process of what and how we came up with the final model. Rough works from individuals can be found in Rough Draft folder.
 
