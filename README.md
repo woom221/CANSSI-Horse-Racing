@@ -11,9 +11,9 @@ The model was built using Python 3.10 version
 Run the following commands to install necessary modules
 
 ```console
-pip install sklearn
+pip install -U scikit-learn
 pip install pandas
-pip install np
+pip install numpy
 ```
 Place the data file name at the following code location under load_data() function
 
